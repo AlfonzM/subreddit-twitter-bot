@@ -1,0 +1,12 @@
+twitter_keys = dict(
+	consumer_key =          '',
+	consumer_secret =       '',
+	access_token =          '',
+	access_token_secret =   ''
+)
+
+reddit_keys = dict(
+	client_id = '',
+	client_secret = '',
+	user_agent = ''
+)
