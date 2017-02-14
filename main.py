@@ -1,3 +1,4 @@
+import sched, time
 import json
 import os
 import re
@@ -19,7 +20,7 @@ auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 twitterApi = tweepy.API(auth)
 
 SUBREDDIT = 'aww'
-IMAGE_URL_LIST = 'links.json'
+IMAGEURLS_FILENAME = 'links.json'
 
 # reddit API
 redditApi = praw.Reddit(
@@ -29,7 +30,7 @@ redditApi = praw.Reddit(
 	)
 
 def checkIfImageAlreadyTweeted(url):
-	fr = open(IMAGE_URL_LIST, 'r')
+	fr = open(IMAGEURLS_FILENAME, 'r')
 	text = fr.read()
 
 	if url not in text:
@@ -42,7 +43,7 @@ def download_media(image_url):
 	image_url = image_url.replace('gifv', 'mp4')
 
 	filename = image_url.split('/')[-1]
-	filepath = "downloads/" + image_url.split('/')[-1]
+	filepath = "downloads/img." + image_url.split('/')[-1].split('.')[-1]
 
 	# get the filesize via header
 	head = requests.head(image_url)
@@ -54,7 +55,7 @@ def download_media(image_url):
 		return
 
 	# download the image
-	print('Downloading ' + filename + '...')
+	print('[' + time.strftime("%m/%d/%Y %I:%M %p") + '] Downloading ' + filename + '...')
 	response = requests.get(image_url)
 
 	if response.status_code == 200:
@@ -62,7 +63,7 @@ def download_media(image_url):
 			for chunk in response.iter_content(4096):
 				fo.write(chunk)
 
-		fw = open(IMAGE_URL_LIST, 'a')
+		fw = open(IMAGEURLS_FILENAME, 'a')
 		fw.write(str(filename) + '\n')
 		return filepath
 
@@ -73,65 +74,74 @@ def isValidImageUrl(url):
 	imagePattern = re.compile(r".*\.(jpg|png|jpeg)$")
 	return imagePattern.match(url)
 
-def addToQueue(urls):
-	for url in urls:
-		with open('links.json', 'r') as f:
-			jsonData = json.load(f)
+def addUrlsToQueueFile(urls):
+	with open(IMAGEURLS_FILENAME, 'r+') as f:
+		jsonData = json.load(f)
+
+		for url in urls:
 			jsonData['queue'].append(url)
 
-		with open('links.json', 'w') as f:
-			f.write(json.dumps(jsonData))
+		jsonData['queue'] = list(set(jsonData['queue']) - set(jsonData['done']))
+
+		f.seek(0)
+		f.write(json.dumps(jsonData))
+		f.truncate()
 
 def getImageUrlsAndQueue():
 	imgUrls = []
 
-	for s in redditApi.subreddit(SUBREDDIT).hot(limit=5):
-		print('---')
-		print(s.url)
+	print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Downloading urls...")
+	for s in redditApi.subreddit(SUBREDDIT).hot(limit=100):
 
 		if not isValidImageUrl(s.url):
-			print ('NOT IMAGE')
 			continue
 
-		print("http://reddit.com" + s.permalink)
+		print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] http://reddit.com" + s.permalink)
 
 		imgUrls.append(s.url)
 		# end for
 
-	addToQueue(imgUrls)
+	addUrlsToQueueFile(imgUrls)
 
 	#end getImageUrlsAndQueue
 
 def tweetFromQueue():
-	with open('links.json', 'r+') as f:
+	with open(IMAGEURLS_FILENAME, 'r+') as f:
 		linksJson = json.load(f)
 
-		# get the first image url from the queue array
 		if not linksJson['queue']:
-			print("Queue is empty! Fetching urls")
+			print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Queue is now empty! Fetching urls...")
 			getImageUrlsAndQueue()
 			tweetFromQueue()
 			return
 
+		# get the first image url from the queue array
 		imageUrl = linksJson['queue'][0]
-
 		if not imageUrl:
 			return
-			
+
 		downloaded_filename = download_media(imageUrl)
 
 		# remove that item from the array
-		linksJson['queue'].pop(0)
+		linksJson['done'].append(linksJson['queue'].pop(0))
 		f.seek(0)
 		f.write(json.dumps(linksJson))
 		f.truncate()
 
 		# tweet it
-		print("tweeting...")
+		print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Tweeting...")
 		if downloaded_filename:
-			twitterApi.update_with_media(downloaded_filename, status='hai')
+			twitterApi.update_with_media(downloaded_filename)
 
-	print('done')
+		print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Tweeted!")
+
 	
-# getImageUrlsAndQueue()
-tweetFromQueue()
+s = sched.scheduler(time.time, time.sleep)
+
+def start(sc): 
+	print('---')
+	tweetFromQueue()
+	s.enter(1800, 1, start, (sc,))
+
+s.enter(1, 1, start, (s,))
+s.run()
