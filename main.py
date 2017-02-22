@@ -31,7 +31,7 @@ twitterApi = tweepy.API(auth)
 
 # FOR TESTING
 # switch to False on prod
-DEVELOPMENT_MODE = True
+DEVELOPMENT_MODE = False
 
 SUBREDDIT = config['subreddit']
 IMAGEURLS_FILENAME = 'links.json'
