@@ -13,6 +13,7 @@ import praw
 from keys import twitter_keys
 from keys import reddit_keys
 from apscheduler.scheduler import Scheduler
+from config import config
 
 # scheduler
 logging.basicConfig()
@@ -24,12 +25,15 @@ CONSUMER_KEY = twitter_keys['consumer_key']
 CONSUMER_SECRET = twitter_keys['consumer_secret']
 ACCESS_TOKEN = twitter_keys['access_token']
 ACCESS_TOKEN_SECRET = twitter_keys['access_token_secret']
-
 auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
 auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
 twitterApi = tweepy.API(auth)
 
-SUBREDDIT = 'aww'
+# FOR TESTING
+# switch to False on prod
+DEVELOPMENT_MODE = True
+
+SUBREDDIT = config['subreddit']
 IMAGEURLS_FILENAME = 'links.json'
 
 # reddit API
@@ -142,31 +146,39 @@ def tweetFromQueue():
 		# tweet it
 		if downloaded_filename:
 			print("Tweeting: " + imageUrl)
-			twitterApi.update_with_media(downloaded_filename)
 
-		print("Tweeted!")
+			if not DEVELOPMENT_MODE:
+				print("Tweeted!")
+				twitterApi.update_with_media(downloaded_filename)
+			else:
+				print("Tweeted but not really!")
 
 def searchAndLike():
 	print('Searching and liking tweets...')
 	count = 0
 
-	query = 'dogs cute'
-	max_tweets = 25
+	query = config['autoliker_search_query']
+	max_tweets = config['autoliker_max_tweets']
 
 	for tweet in tweepy.Cursor(twitterApi.search, q=query, include_entities=True).items(max_tweets):
 		try:
-			twitterApi.create_favorite(tweet.id)
-			print("[/] " + tweet.text)
+			if not DEVELOPMENT_MODE:
+				twitterApi.create_favorite(tweet.id)
+				print("Liked: " + tweet.text)
+			else:
+				print("Liked but not really: " + tweet.text)
+
 			count += 1
+				
 		except tweepy.TweepError as e:
 			print(e.message[0]['message'] + ' :: ' + tweet.id)
 
-	print(bcolors.ENDC + '--- ' + str(count) + ' tweets liked. ---\n')
+	print('--- ' + str(count) + ' tweets liked. ---\n')
 
 # START
 print "--- RUNNING DOGGIES BOT ---"
-sched.add_cron_job(tweetFromQueue, minute='0,30')
-sched.add_cron_job(searchAndLike, minute='15,45')
+sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
+sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
 
 try:
 	sched.start()
