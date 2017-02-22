@@ -7,7 +7,6 @@ import urllib
 import requests
 import tweepy
 import praw
-from bcolors import bcolors
 from keys import twitter_keys
 from keys import reddit_keys
 from apscheduler.scheduler import Scheduler
