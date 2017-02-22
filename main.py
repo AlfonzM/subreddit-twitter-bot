@@ -66,7 +66,7 @@ def download_media(image_url):
 	response = requests.get(image_url)
 
 	if response.status_code == 200:
-		with open(filepath, 'wb') as fo:
+		with open(filepath, 'wb+') as fo:
 			for chunk in response.iter_content(4096):
 				fo.write(chunk)
 
