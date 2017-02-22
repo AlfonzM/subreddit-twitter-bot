@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import datetime
 import logging
 import json
@@ -148,7 +151,7 @@ def searchAndLike():
 	count = 0
 
 	query = 'dogs cute'
-	max_tweets = 10
+	max_tweets = 25
 
 	for tweet in tweepy.Cursor(twitterApi.search, q=query, include_entities=True).items(max_tweets):
 		try:
