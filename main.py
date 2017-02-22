@@ -1,4 +1,5 @@
-import sched, time
+import datetime
+import logging
 import json
 import os
 import re
@@ -6,8 +7,15 @@ import urllib
 import requests
 import tweepy
 import praw
+from bcolors import bcolors
 from keys import twitter_keys
 from keys import reddit_keys
+from apscheduler.scheduler import Scheduler
+
+# scheduler
+logging.basicConfig()
+sched = Scheduler(standalone=True)
+sched.daemonic = False
 
 # twitter API
 CONSUMER_KEY = twitter_keys['consumer_key']
@@ -55,7 +63,7 @@ def download_media(image_url):
 		return
 
 	# download the image
-	print('[' + time.strftime("%m/%d/%Y %I:%M %p") + '] Downloading ' + filename + '...')
+	print('Downloading ' + filename + '...')
 	response = requests.get(image_url)
 
 	if response.status_code == 200:
@@ -90,13 +98,13 @@ def addUrlsToQueueFile(urls):
 def getImageUrlsAndQueue():
 	imgUrls = []
 
-	print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Downloading urls...")
+	print("Downloading urls...")
 	for s in redditApi.subreddit(SUBREDDIT).hot(limit=100):
 
 		if not isValidImageUrl(s.url):
 			continue
 
-		print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] http://reddit.com" + s.permalink)
+		print("http://reddit.com" + s.permalink)
 
 		imgUrls.append(s.url)
 		# end for
@@ -106,11 +114,12 @@ def getImageUrlsAndQueue():
 	#end getImageUrlsAndQueue
 
 def tweetFromQueue():
+	print("Running tweetFromQueue()")
 	with open(IMAGEURLS_FILENAME, 'r+') as f:
 		linksJson = json.load(f)
 
 		if not linksJson['queue']:
-			print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Queue is now empty! Fetching urls...")
+			print("Queue is now empty! Fetching urls...")
 			getImageUrlsAndQueue()
 			tweetFromQueue()
 			return
@@ -129,19 +138,37 @@ def tweetFromQueue():
 		f.truncate()
 
 		# tweet it
-		print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Tweeting...")
 		if downloaded_filename:
-			twitterApi.update_with_media(downloaded_filename)
+			print("Tweeting: " + imageUrl)
+			# twitterApi.update_with_media(downloaded_filename)
 
-		print("[" + time.strftime("%m/%d/%Y %I:%M %p") + "] Tweeted!")
+		print("Tweeted!")
 
-	
-s = sched.scheduler(time.time, time.sleep)
+def searchAndLike():
+	print('Searching and liking tweets...')
+	count = 0
 
-def start(sc): 
-	print('---')
-	tweetFromQueue()
-	s.enter(1800, 1, start, (sc,))
+	query = 'dogs cute'
+	max_tweets = 10
 
-s.enter(1, 1, start, (s,))
-s.run()
+	for tweet in tweepy.Cursor(twitterApi.search, q=query, include_entities=True).items(max_tweets):
+		try:
+			twitterApi.create_favorite(tweet.id)
+			print("[/] " + tweet.text)
+			count += 1
+		except tweepy.TweepError as e:
+			print(e.message[0]['message'] + ' :: ' + tweet.id)
+
+	print(bcolors.ENDC + '--- ' + str(count) + ' tweets liked. ---\n')
+
+# START
+print "--- RUNNING DOGGIES BOT ---"
+sched.add_cron_job(tweetFromQueue, minute='0,30')
+sched.add_cron_job(searchAndLike, minute='15,45')
+
+try:
+	sched.start()
+except KeyboardInterrupt:
+    print('Got SIGTERM! Terminating...')
+except Exception as e:
+	print(e)
