@@ -139,7 +139,7 @@ def tweetFromQueue():
 		# tweet it
 		if downloaded_filename:
 			print("Tweeting: " + imageUrl)
-			# twitterApi.update_with_media(downloaded_filename)
+			twitterApi.update_with_media(downloaded_filename)
 
 		print("Tweeted!")
 
