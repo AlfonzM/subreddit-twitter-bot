@@ -171,7 +171,8 @@ def searchAndLike():
 			count += 1
 				
 		except tweepy.TweepError as e:
-			print(e.message[0]['message'] + ' :: ' + tweet.id)
+			print(e)
+			print(e.message[0]['message'] + ' :: ' + str(tweet.id))
 
 	print('--- ' + str(count) + ' tweets liked. ---\n')
 
