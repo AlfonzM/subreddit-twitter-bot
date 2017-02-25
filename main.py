@@ -171,9 +171,9 @@ def searchAndLike():
 		try:
 			if not DEVELOPMENT_MODE:
 				twitterApi.create_favorite(tweet.id)
-				print("Liked: " + tweet.text)
+				print("Liked: " + unicode(tweet.text))
 			else:
-				print("Liked but not really: " + tweet.text)
+				print("Liked but not really: " + unicode(tweet.text))
 
 			count += 1
 				
@@ -189,7 +189,7 @@ def start():
 	sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
 
 	if config['autoliker_enabled'] and not DEVELOPMENT_MODE:
-		print "Running autoliker for " + config['autoliker_search_query'] + "..."
+		print "Running autoliker for: " + config['autoliker_search_query'] + "..."
 		sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
 
 	try:
