@@ -33,10 +33,9 @@ twitterApi = tweepy.API(auth)
 
 # FOR TESTING
 # switch to False on prod
-DEVELOPMENT_MODE = True
+DEVELOPMENT_MODE = config['development_mode']
 
-SUBREDDIT = config['subreddit']
-IMAGEURLS_FILENAME = 'links.json'
+SUBMISSION_QUEUE_FILENAME = 'links.json'
 
 # reddit API
 redditApi = praw.Reddit(
@@ -46,7 +45,7 @@ redditApi = praw.Reddit(
 	)
 
 def checkIfImageAlreadyTweeted(url):
-	fr = open(IMAGEURLS_FILENAME, 'r')
+	fr = open(SUBMISSION_QUEUE_FILENAME, 'r')
 	text = fr.read()
 
 	if url not in text:
@@ -79,7 +78,7 @@ def download_media(image_url):
 			for chunk in response.iter_content(4096):
 				fo.write(chunk)
 
-		fw = open(IMAGEURLS_FILENAME, 'a')
+		fw = open(SUBMISSION_QUEUE_FILENAME, 'a')
 		fw.write(str(filename) + '\n')
 		return filepath
 
@@ -90,22 +89,20 @@ def isValidImageUrl(url):
 	imagePattern = re.compile(r".*\.(jpg|png|jpeg)$")
 	return imagePattern.match(url)
 
-def getImageUrlsAndQueue():
+def getSubmissionsAndQueue():
 	submissions = {}
 
-	print("Downloading urls...")
+	print("Downloading submissions...")
 
-	with open(IMAGEURLS_FILENAME, 'r+') as f:
+	with open(SUBMISSION_QUEUE_FILENAME, 'r+') as f:
 		jsonData = json.load(f)
 
-		# jsonData['queue'] = list(set(jsonData['queue']) - set(jsonData['done']))
+		hot_submissions = redditApi.subreddit(config['subreddit']).hot(limit=100)
 
-		for submission in redditApi.subreddit(SUBREDDIT).hot(limit=100):
-
-			if not isValidImageUrl(submission.url):
+		# loop all hot submissions and save them to queue
+		for submission in hot_submissions:
+			if config['image_submissions_only'] and not isValidImageUrl(submission.url):
 				continue
-
-			# print("http://reddit.com" + submission.permalink + " :: " + submission.title)
 
 			if not submission.id in jsonData['done']:
 				jsonData['queue'][submission.id] = {
@@ -119,16 +116,16 @@ def getImageUrlsAndQueue():
 		f.write(json.dumps(jsonData))
 		f.truncate()
 
-	#end getImageUrlsAndQueue
+	#end getSubmissionsAndQueue
 
 def tweetFromQueue():
 	print("Running tweetFromQueue()")
-	with open(IMAGEURLS_FILENAME, 'r+') as f:
+	with open(SUBMISSION_QUEUE_FILENAME, 'r+') as f:
 		linksJson = json.load(f)
 
 		if not linksJson['queue']:
-			print("Queue is now empty! Fetching urls...")
-			getImageUrlsAndQueue()
+			print("Queue is now empty! Fetching submissions...")
+			getSubmissionsAndQueue()
 			tweetFromQueue()
 			return
 
@@ -151,11 +148,17 @@ def tweetFromQueue():
 			print("Tweeting: " + submission['permalink'])
 
 			if not DEVELOPMENT_MODE:
-				print("Tweeted!")
-				twitterApi.update_with_media(downloaded_filename)
+				if config['tweet_with_title']:
+					print("Tweeted with title!")
+					twitterApi.update_with_media(downloaded_filename, status=submission['title'])
+				else:
+					print("Tweeted image only!")
+					twitterApi.update_with_media(downloaded_filename)
 			else:
-				print(submission['title'])
+				print(submission['title'] + ' :: ' + downloaded_filename)
 				print("Tweeted but not really!")
+
+		print("Queue: " + str(len(linksJson['queue'])) + " / Done: " + str(len(linksJson['done'])))
 
 def searchAndLike():
 	print('Searching and liking tweets...')
@@ -181,11 +184,14 @@ def searchAndLike():
 
 	print('--- ' + str(count) + ' tweets liked. ---\n')
 
-# START
-print "--- RUNNING DOGGIES BOT ---"
-tweetFromQueue()
-# sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
-# sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
+def start():
+	print "--- RUNNING r/" + config['subreddit'] + " BOT ---"
+	tweetFromQueue()
+	# sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
+
+	if config['autoliker_enabled'] and not DEVELOPMENT_MODE:
+		print "Running autoliker for " + config['autoliker_search_query'] + "..."
+		sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
 
 try:
 	sched.start()
@@ -193,3 +199,6 @@ except KeyboardInterrupt:
     print('Got SIGTERM! Terminating...')
 except Exception as e:
 	print(e)
+
+# START SCRIPT
+start()
