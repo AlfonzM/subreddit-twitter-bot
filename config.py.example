@@ -1,7 +1,7 @@
 config = dict(
 	development_mode		= False,
 	subreddit 				= 'rarepuppers',
-	tweet_images_only 		= True,
+	image_submissions_only 	= True,
 	tweet_with_title 		= True,
 
 	# cron minute for tweet (e.g. '15,45' will run tweetFromQueue every x:15 and x:45)
@@ -11,9 +11,9 @@ config = dict(
 	autoliker_enabled = False,
 
 	# cron minute for autoliker (e.g. '15,45' will run autoliker every x:15 and x:45)
-	autoliker_cron_minute 	= '15,45',
+	autoliker_cron_minute 	= '0,45',
 
 	# max tweets to like every time searchAndLike is run
-	autoliker_max_tweets 	= 25,
+	autoliker_max_tweets 	= 20,
 	autoliker_search_query 	= 'dog memes'
 )
