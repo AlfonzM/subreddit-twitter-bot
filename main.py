@@ -186,19 +186,18 @@ def searchAndLike():
 
 def start():
 	print "--- RUNNING r/" + config['subreddit'] + " BOT ---"
-	tweetFromQueue()
-	# sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
+	sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
 
 	if config['autoliker_enabled'] and not DEVELOPMENT_MODE:
 		print "Running autoliker for " + config['autoliker_search_query'] + "..."
 		sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
 
-try:
-	sched.start()
-except KeyboardInterrupt:
-    print('Got SIGTERM! Terminating...')
-except Exception as e:
-	print(e)
+	try:
+		sched.start()
+	except KeyboardInterrupt:
+	    print('Got SIGTERM! Terminating...')
+	except Exception as e:
+		print(e)
 
 # START SCRIPT
 start()
