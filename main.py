@@ -4,6 +4,7 @@
 import datetime
 import logging
 import json
+import sys
 import os
 import re
 import urllib
@@ -14,6 +15,7 @@ from keys import twitter_keys
 from keys import reddit_keys
 from apscheduler.scheduler import Scheduler
 from config import config
+from pprint import pprint
 
 # scheduler
 logging.basicConfig()
@@ -31,7 +33,7 @@ twitterApi = tweepy.API(auth)
 
 # FOR TESTING
 # switch to False on prod
-DEVELOPMENT_MODE = False
+DEVELOPMENT_MODE = True
 
 SUBREDDIT = config['subreddit']
 IMAGEURLS_FILENAME = 'links.json'
@@ -88,34 +90,34 @@ def isValidImageUrl(url):
 	imagePattern = re.compile(r".*\.(jpg|png|jpeg)$")
 	return imagePattern.match(url)
 
-def addUrlsToQueueFile(urls):
+def getImageUrlsAndQueue():
+	submissions = {}
+
+	print("Downloading urls...")
+
 	with open(IMAGEURLS_FILENAME, 'r+') as f:
 		jsonData = json.load(f)
 
-		for url in urls:
-			jsonData['queue'].append(url)
+		# jsonData['queue'] = list(set(jsonData['queue']) - set(jsonData['done']))
 
-		jsonData['queue'] = list(set(jsonData['queue']) - set(jsonData['done']))
+		for submission in redditApi.subreddit(SUBREDDIT).hot(limit=100):
+
+			if not isValidImageUrl(submission.url):
+				continue
+
+			# print("http://reddit.com" + submission.permalink + " :: " + submission.title)
+
+			if not submission.id in jsonData['done']:
+				jsonData['queue'][submission.id] = {
+					'title': submission.title,
+					'permalink': "http://reddit.com" + submission.permalink,
+					'image_url': submission.url
+				}
+			# end for
 
 		f.seek(0)
 		f.write(json.dumps(jsonData))
 		f.truncate()
-
-def getImageUrlsAndQueue():
-	imgUrls = []
-
-	print("Downloading urls...")
-	for s in redditApi.subreddit(SUBREDDIT).hot(limit=100):
-
-		if not isValidImageUrl(s.url):
-			continue
-
-		print("http://reddit.com" + s.permalink)
-
-		imgUrls.append(s.url)
-		# end for
-
-	addUrlsToQueueFile(imgUrls)
 
 	#end getImageUrlsAndQueue
 
@@ -130,27 +132,29 @@ def tweetFromQueue():
 			tweetFromQueue()
 			return
 
-		# get the first image url from the queue array
-		imageUrl = linksJson['queue'][0]
-		if not imageUrl:
+		# pop the first submission object from the queue
+		submissionId, submission = linksJson['queue'].popitem()
+
+		if not submission:
 			return
 
-		downloaded_filename = download_media(imageUrl)
+		downloaded_filename = download_media(submission['image_url'])
 
-		# remove that item from the array
-		linksJson['done'].append(linksJson['queue'].pop(0))
+		# add the submission to "done"
+		linksJson['done'][submissionId] = submission
 		f.seek(0)
 		f.write(json.dumps(linksJson))
 		f.truncate()
 
 		# tweet it
 		if downloaded_filename:
-			print("Tweeting: " + imageUrl)
+			print("Tweeting: " + submission['permalink'])
 
 			if not DEVELOPMENT_MODE:
 				print("Tweeted!")
 				twitterApi.update_with_media(downloaded_filename)
 			else:
+				print(submission['title'])
 				print("Tweeted but not really!")
 
 def searchAndLike():
@@ -173,13 +177,15 @@ def searchAndLike():
 		except tweepy.TweepError as e:
 			print(e)
 			print(e.message[0]['message'] + ' :: ' + str(tweet.id))
+			sys.exit(0)
 
 	print('--- ' + str(count) + ' tweets liked. ---\n')
 
 # START
 print "--- RUNNING DOGGIES BOT ---"
-sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
-sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
+tweetFromQueue()
+# sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
+# sched.add_cron_job(searchAndLike, minute=config['autoliker_cron_minute'])
 
 try:
 	sched.start()
