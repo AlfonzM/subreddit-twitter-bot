@@ -1,8 +1,14 @@
 config = dict(
-	development_mode		= False,
-	subreddit 				= 'rarepuppers',
+	# When set to true, bot will not actually tweet or auto like
+	development_mode		= True,
+	subreddit 				= 'earthporn',
 	image_submissions_only 	= True,
 	tweet_with_title 		= True,
+
+	# Use this regex to remove unwanted substrings in the title
+	# set to None or False otherwise
+	tweet_title_regex = '(\[|\()(OC|[0-9]+(\ ?.\ ?)[0-9]+)?(\]|\))',
+	# tweet_title_regex = None,
 
 	# cron minute for tweet (e.g. '15,45' will run tweetFromQueue every x:15 and x:45)
 	tweet_cron_minute 		= '0,30',
