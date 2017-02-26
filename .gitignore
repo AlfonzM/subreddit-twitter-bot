@@ -1,4 +1,3 @@
 *.pyc
 keys.py
 config.py
-downloads/*

@@ -92,7 +92,7 @@ def isValidImageUrl(url):
 def getSubmissionsAndQueue():
 	submissions = {}
 
-	print("Downloading submissions...")
+	print("Downloading submissions from r/" + config['subreddit'] + "...")
 
 	with open(SUBMISSION_QUEUE_FILENAME, 'r+') as f:
 		jsonData = json.load(f)
@@ -147,16 +147,21 @@ def tweetFromQueue():
 		if downloaded_filename:
 			print("Tweeting: " + submission['permalink'])
 
+			# Clean the title string with the regex
+			if config['tweet_title_regex']:
+				submission['title'] = re.sub(config['tweet_title_regex'], '', submission['title'], flags=re.IGNORECASE).strip()
+				print("Transformed title: " + submission['title'])
+
+			# TWEET IT
 			if not DEVELOPMENT_MODE:
 				if config['tweet_with_title']:
-					print("Tweeted with title!")
 					twitterApi.update_with_media(downloaded_filename, status=submission['title'])
+					print("Tweeted with title!")
 				else:
-					print("Tweeted image only!")
 					twitterApi.update_with_media(downloaded_filename)
+					print("Tweeted image only!")
 			else:
-				print(submission['title'] + ' :: ' + downloaded_filename)
-				print("Tweeted but not really!")
+				print("Tweeted but not really! " + submission['title'] + ' :: ' + downloaded_filename)
 
 		print("Queue: " + str(len(linksJson['queue'])) + " / Done: " + str(len(linksJson['done'])))
 
