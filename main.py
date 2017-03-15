@@ -11,9 +11,9 @@ import urllib
 import requests
 import tweepy
 import praw
-from keys import twitter_keys
-from keys import reddit_keys
 from apscheduler.scheduler import Scheduler
+from config import twitter_keys
+from config import reddit_keys
 from config import config
 from pprint import pprint
 
@@ -176,9 +176,9 @@ def searchAndLike():
 		try:
 			if not DEVELOPMENT_MODE:
 				twitterApi.create_favorite(tweet.id)
-				print("Liked: " + unicode(tweet.text))
+				print("Liked: http://twitter.com/statuses/" + str(tweet.id))
 			else:
-				print("Liked but not really: " + unicode(tweet.text))
+				print("Liked but not really: http://twitter.com/statuses/" + str(tweet.id))
 
 			count += 1
 				
@@ -192,6 +192,9 @@ def searchAndLike():
 def start():
 	print "--- RUNNING r/" + config['subreddit'] + " BOT ---"
 	sched.add_cron_job(tweetFromQueue, minute=config['tweet_cron_minute'])
+
+	tweetFromQueue()
+	searchAndLike()
 
 	if config['autoliker_enabled'] and not DEVELOPMENT_MODE:
 		print "Running autoliker for: " + config['autoliker_search_query'] + "..."
